@@ -1,0 +1,22 @@
+# OAuth credentials — never commit
+credentials.json
+token.json
+
+# Generated files — review manually before each build
+matches.csv
+registration_check.csv
+registration_check.xlsx
+
+# Active conference config — copy config.example.py → config.py and fill in
+config.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# macOS / editor noise
+.DS_Store
+~$*
+*.swp
