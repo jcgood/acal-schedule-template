@@ -172,6 +172,58 @@ by status bucket (confirmed in-person, confirmed remote, unconfirmed).
 
 ---
 
+## Avoiding character encoding corruption
+
+Non-ASCII characters in author names (accented letters, non-Latin scripts)
+are a persistent source of data corruption. This section explains where it
+goes wrong and how to prevent it.
+
+### The root cause: Excel's CSV import
+
+The failure mode is: abstract system exports data as UTF-8 CSV → organizer
+opens it by double-clicking in Excel → Excel guesses Mac Roman or Windows-1252
+→ multi-byte UTF-8 sequences are misread as two separate characters (e.g. `é`
+becomes `√©`) → the xlsx is saved with the garbled text baked in → all
+downstream scripts inherit the corruption.
+
+**Never open a UTF-8 CSV by double-clicking in Excel.** Always import via
+**Data → Get Data → From Text/CSV** and explicitly choose UTF-8. Or use Google
+Sheets, which handles UTF-8 correctly on import.
+
+### Preferred approach: keep abstract tracking in Google Sheets
+
+If your abstract submission system can export to Google Sheets directly (or via
+CSV import into Sheets), do that instead of maintaining a local xlsx. The
+`load_abstracts.py` script already authenticates to Google via OAuth — you can
+extend it to read from a Sheets tab rather than a local file, eliminating the
+Excel-in-the-middle risk entirely.
+
+### Defense-in-depth: ftfy
+
+`ftfy` ("fixes text for you") detects and repairs the most common mojibake
+patterns automatically. Add it to `requirements.txt` and apply it at the top
+of `load_abstracts.py`:
+
+```python
+from ftfy import fix_text
+
+# After reading the xlsx/csv into a DataFrame:
+df = df.map(lambda x: fix_text(x) if isinstance(x, str) else x)
+```
+
+This won't fix corruption that has already propagated to downstream files, but
+it will silently correct any future cases where an xlsx arrives with encoding
+damage. It is safe to run unconditionally — `fix_text` is a no-op on clean text.
+
+### Spotting corruption early
+
+Run `conf.py doctor` and inspect author names in `matches.csv` for sequences
+like `√©`, `Ã©`, `â€"`, or `â€˜` — these are reliable signs of mojibake.
+Catching them in `matches.csv` (before `conf.py build`) is much cheaper than
+hunting them down in a published schedule.
+
+---
+
 ## Tips and common tasks
 
 ### Updating a single talk's abstract link
